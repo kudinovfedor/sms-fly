@@ -1,0 +1,46 @@
+{
+  "name": "kudinovfedor/sms-fly",
+  "description": "SMS FLY API (XML)",
+  "type": "library",
+  "keywords": [
+    "composer",
+    "package",
+    "library",
+    "sms",
+    "sms fly",
+    "sms api",
+    "sms XML"
+  ],
+  "homepage": "https://joompress.biz",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Kudinov Fedor",
+      "email": "admin@joompress.biz",
+      "homepage": "https://joompress.biz/about-me/",
+      "role": "Developer"
+    }
+  ],
+  "support": {
+    "email": "admin@joompress.biz",
+    "issues": "https://github.com/kudinovfedor/sms-fly/issues",
+    "source": "https://github.com/kudinovfedor/sms-fly"
+  },
+  "minimum-stability": "dev",
+  "require": {
+    "php": ">=5.6",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "KudinovFedor\\SmsFly\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  },
+  "prefer-stable": true
+}

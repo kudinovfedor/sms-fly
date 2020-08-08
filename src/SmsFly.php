@@ -3,17 +3,17 @@
 namespace KudinovFedor\SmsFly;
 
 use Exception;
-use SimpleXMLElement;
 
 /**
  * Class SmsFly
+ * @package KudinovFedor\SmsFly
  * @author Kudinov Fedor <admin@joompress.biz>
  * @license https://opensource.org/licenses/mit-license.php MIT
  * @link https://github.com/kudinovfedor/sms-fly
  */
 class SmsFly
 {
-    const VERSION = '0.0.1';
+    const VERSION = '0.0.2';
 
     /**
      * Service Address
@@ -96,6 +96,13 @@ class SmsFly
     private $recipient;
 
     /**
+     * Mailing identifier in the system.
+     *
+     * @var int|string
+     */
+    private $campaignId;
+
+    /**
      * Sender. Specifies an alphanumeric name (alpha name).
      *
      * @description Only alphanumeric names registered for the user are allowed.
@@ -105,22 +112,17 @@ class SmsFly
     private $source = 'InfoCentr';
 
     /**
+     * @var ParseXml
+     */
+    private $parseXML;
+
+    /**
      * Statuses
      *
      * @var array
      */
-    private $statusCode = [
+    private $messages = [
         'DENIED' => 'Неверные учетные данные!',
-        'ACCEPT' => 'Сообщение принято системой и поставлено в очередь на формирование рассылки.',
-        'XMLERROR' => 'Некорректный XML .',
-        'ERRPHONES' => 'Неверно задан номер получателя.',
-        'ERRSTARTTIME' => 'Не корректное время начала отправки.',
-        'ERRENDTIME' => 'Не корректное время окончания рассылки.',
-        'ERRLIFETIME' => 'Не корректное время жизни сообщения.',
-        'ERRSPEED' => 'Не корректная скорость отправки сообщений.',
-        'ERRALFANAME' => 'Дданное альфанумерическое имя использовать запрещено, либо ошибка .',
-        'ERRTEXT' => 'Некорректный текст сообщения.',
-        'INSUFFICIENTFUNDS' => 'Недостаточно средств. Проверяется только при получении запроса на отправку СМС сообщения одному абоненту.',
     ];
 
     /**
@@ -132,7 +134,9 @@ class SmsFly
     {
         if ($args['login']) $this->login = $args['login'];
         if ($args['password']) $this->password = $args['password'];
-        if ($args['source']) $this->source = htmlspecialchars($args['source']);
+        if ($args['from']) $this->setFrom($args['from']);
+
+        $this->parseXML = new ParseXML();
     }
 
     /**
@@ -162,14 +166,14 @@ class SmsFly
     }
 
     /**
-     * Set source
+     * Set from
      *
-     * @param string $source
+     * @param string $from
      * @return SmsFly
      */
-    public function setSource($source)
+    public function setFrom($from)
     {
-        $this->source = htmlspecialchars($source);
+        $this->source = htmlspecialchars($from);
 
         return $this;
     }
@@ -231,22 +235,22 @@ class SmsFly
     }
 
     /**
-     * Set recipient
+     * Set to
      *
-     * @param string|array $recipient
+     * @param string|array $to
      * @return SmsFly
      */
-    public function setRecipient($recipient)
+    public function setTo($to)
     {
-        if (is_array($recipient)) {
+        if (is_array($to)) {
 
             $recipient = array_map(function ($phone) {
-                return preg_replace('/[^0-9+]/', '', $phone);
-            }, $recipient);
+                return $this->formatPhoneNumber($phone);
+            }, $to);
 
         } else {
 
-            $recipient = preg_replace('/[^0-9+]/', '', $recipient);
+            $recipient = $this->formatPhoneNumber($to);
 
         }
 
@@ -269,14 +273,27 @@ class SmsFly
     }
 
     /**
-     * Set status code
+     * Set campaign id
      *
-     * @param array $statusCode
+     * @param int|string $campaignId
      * @return SmsFly
      */
-    public function setStatusCode($statusCode)
+    public function setCampaignId($campaignId)
     {
-        $this->statusCode = $statusCode;
+        $this->campaignId = $campaignId;
+
+        return $this;
+    }
+
+    /**
+     * Set messages
+     *
+     * @param array $messages
+     * @return SmsFly
+     */
+    public function setMessages($messages)
+    {
+        $this->messages = $messages;
 
         return $this;
     }
@@ -284,34 +301,37 @@ class SmsFly
     /**
      * Send SMS
      *
+     * @param array $args
      * @return mixed
      */
-    public function sendSms()
+    public function sendSMS($args = [])
     {
-        $xml = '<?xml version="1.0" encoding="UTF-8" ?>' . PHP_EOL;
-        $xml .= '<request>';
-        $xml .= '<operation>SENDSMS</operation>';
+        $default = [
+            'to' => $this->recipient,
+            'message' => $this->message,
+        ];
+
+        $args = array_merge($default, $args);
+
+        $xml = $this->startXml();
+        $xml .= '<request><operation>SENDSMS</operation>';
         $xml .= sprintf(
             '<message start_time="%s" end_time="%s" lifetime="%d" rate="%d" desc="%s" source="%s" version="%s">' . PHP_EOL,
             $this->startTime, $this->endTime, $this->lifeTime, $this->rate, $this->description, $this->source, self::VERSION
         );
-        $xml .= '<body>' . $this->message . '</body>';
+        $xml .= '<body>' . $args['message'] . '</body>';
 
-        if (is_array($this->recipient)) {
-            foreach ($this->recipient as $phone) {
+        if (is_array($args['to'])) {
+            foreach ($args['to'] as $phone) {
                 $xml .= '<recipient>' . $phone . '</recipient>';
             }
         } else {
-            $xml .= '<recipient>' . $this->recipient . '</recipient>';
+            $xml .= '<recipient>' . $args['to'] . '</recipient>';
         }
 
         $xml .= '</message></request>';
 
-        $response = $this->request($xml);
-
-        if ($response) return $this->parse($response, 'code');
-
-        return false;
+        return $this->sendRequest($xml, 'sendSMS');
     }
 
     /**
@@ -321,12 +341,113 @@ class SmsFly
      */
     public function getBalance()
     {
-        $xml = '<?xml version="1.0" encoding="UTF-8" ?>' . PHP_EOL;
+        $xml = $this->startXml();
         $xml .= '<request><operation>GETBALANCE</operation></request>';
 
-        $response = $this->request($xml);
+        return $this->sendRequest($xml, 'balance');
+    }
 
-        if ($response) return $this->parse($response, 'balance');
+    /**
+     * Get campaign info
+     *
+     * @param int|string $campaignId
+     * @return mixed
+     */
+    public function getCampaignInfo($campaignId = null)
+    {
+        $campaignId = is_numeric($campaignId) ? $campaignId : $this->campaignId;
+
+        $xml = $this->startXml();
+        $xml .= '<request><operation>GETCAMPAIGNINFO</operation><message campaignID="' . $campaignId . '" /></request>';
+
+        return $this->sendRequest($xml, 'campaignInfo');
+    }
+
+    /**
+     * Get campaign detail
+     *
+     * @param int|string $campaignId
+     * @return mixed
+     */
+    public function getCampaignDetail($campaignId = null)
+    {
+        $campaignId = is_numeric($campaignId) ? $campaignId : $this->campaignId;
+
+        $xml = $this->startXml();
+        $xml .= '<request><operation>GETCAMPAIGNDETAIL</operation><message campaignID="' . $campaignId . '" /></request>';
+
+        return $this->sendRequest($xml, 'campaignDetail');
+    }
+
+    /**
+     * Get message status
+     *
+     * @param string $recipient
+     * @param int|string $campaignId
+     * @return mixed
+     */
+    public function getMessageStatus($recipient = null, $campaignId = null)
+    {
+        $recipient = is_string($campaignId) ? $recipient : $this->recipient;
+        $campaignId = is_numeric($campaignId) ? $campaignId : $this->campaignId;
+
+        $xml = $this->startXml();
+        $xml .= '<request><operation>GETMESSAGESTATUS</operation><message campaignID="' . $campaignId . '" recipient="' . $recipient . '" /></request>';
+
+        return $this->sendRequest($xml, 'messageStatus');
+    }
+
+    /**
+     * Add alfaname
+     *
+     * @param string $alfaname
+     *
+     * @return mixed
+     */
+    public function addAlfaname($alfaname)
+    {
+        $xml = $this->startXml();
+        $xml .= '<request><operation>MANAGEALFANAME</operation><command id="ADDALFANAME" alfaname="' . $alfaname . '" /></request>';
+
+        return $this->sendRequest($xml, 'addAlfaname');
+    }
+
+    /**
+     * Check alfaname
+     *
+     * @param string $alfaname
+     *
+     * @return mixed
+     */
+    public function checkAlfaname($alfaname)
+    {
+        $xml = $this->startXml();
+        $xml .= '<request><operation>MANAGEALFANAME</operation><command id="CHECKALFANAME" alfaname="' . $alfaname . '" /></request>';
+
+        return $this->sendRequest($xml, 'checkAlfaname');
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getAlfanamesList()
+    {
+        $xml = $this->startXml();
+        $xml .= '<request><operation>MANAGEALFANAME</operation><command id="GETALFANAMESLIST" /></request>';
+
+        return $this->sendRequest($xml, 'alfanamesList');
+    }
+
+    /**
+     * @param string $data
+     * @param string $parseMethod
+     * @return mixed
+     */
+    private function sendRequest($data, $parseMethod)
+    {
+        $response = $this->request($data);
+
+        if ($response) return $this->parse($response, $parseMethod);
 
         return false;
     }
@@ -367,70 +488,42 @@ class SmsFly
      * Parse XML
      *
      * @param string $data
-     * @param string $child
+     * @param string $method
      * @return mixed
      */
-    private function parse($data, $child)
+    private function parse($data, $method)
     {
         if ($data === 'Access denied! Incorrect login or password.') {
-            return $this->statusCode['DENIED'];
+            return $this->messages['DENIED'];
         }
 
         try {
-            $xml = new SimpleXMLElement($data);
+            $this->parseXML->setXML($data);
 
-            if ($child === 'code') {
-
-                $code = (string)$xml->state['code'];
-
-                switch ($code) {
-                    case 'ACCEPT':
-                        $text = $this->statusCode['ACCEPT'];
-                        break;
-                    case 'XMLERROR':
-                        $text = $this->statusCode['XMLERROR'];
-                        break;
-                    case 'ERRPHONES':
-                        $text = $this->statusCode['ERRPHONES'];
-                        break;
-                    case 'ERRSTARTTIME':
-                        $text = $this->statusCode['ERRSTARTTIME'];
-                        break;
-                    case 'ERRENDTIME':
-                        $text = $this->statusCode['ERRENDTIME'];
-                        break;
-                    case 'ERRLIFETIME':
-                        $text = $this->statusCode['ERRLIFETIME'];
-                        break;
-                    case 'ERRSPEED':
-                        $text = $this->statusCode['ERRSPEED'];
-                        break;
-                    case 'ERRALFANAME':
-                        $text = $this->statusCode['ERRALFANAME'];
-                        break;
-                    case 'ERRTEXT':
-                        $text = $this->statusCode['ERRTEXT'];
-                        break;
-                    case 'INSUFFICIENTFUNDS':
-                        $text = $this->statusCode['INSUFFICIENTFUNDS'];
-                        break;
-                    default:
-                        error_log($data);
-                        return false;
-                }
-
-                return $text;
-
-            } elseif ($child === 'balance') {
-
-                return (string)$xml->balance;
-
-            }
-
+            return $this->parseXML->$method();
         } catch (Exception $e) {
             error_log($data);
 
             return false;
         }
+    }
+
+    /**
+     * Format phone number
+     *
+     * @param string $phoneNumber
+     * @return string
+     */
+    public function formatPhoneNumber($phoneNumber)
+    {
+        return preg_replace('/[^0-9+]/', '', $phoneNumber);
+    }
+
+    /**
+     * @return string
+     */
+    private function startXml()
+    {
+        return '<?xml version="1.0" encoding="utf-8"?>' . PHP_EOL;
     }
 }

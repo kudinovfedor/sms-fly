@@ -59,7 +59,7 @@ $detail = $smsFly->getCampaignDetail('3917349');
 ```php
 $smsFly->setTo('380989361131');
 $smsFly->setCampaignId('3917349');
-$messageStatus = $smsFly->getMessageStatus('380989361131', '3917349');
+$messageStatus = $smsFly->getMessageStatus();
 
 // or
 $messageStatus = $smsFly->getMessageStatus('380989361131', '3917349');

@@ -132,9 +132,9 @@ class SmsFly
      */
     public function __construct($args = [])
     {
-        if ($args['login']) $this->login = $args['login'];
-        if ($args['password']) $this->password = $args['password'];
-        if ($args['from']) $this->setFrom($args['from']);
+        if (!empty($args['login'])) $this->login = $args['login'];
+        if (!empty($args['password'])) $this->password = $args['password'];
+        if (!empty($args['from'])) $this->setFrom($args['from']);
 
         $this->parseXML = new ParseXML();
     }

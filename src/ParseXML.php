@@ -58,49 +58,19 @@ class ParseXML
     /**
      * Send sms
      *
-     * @return string
+     * @return string|bool
      */
     public function sendSMS()
     {
         $code = (string)$this->xml->state['code'];
-
-        switch ($code) {
-            case 'ACCEPT':
-                $text = $this->statusCode['ACCEPT'];
-                break;
-            case 'XMLERROR':
-                $text = $this->statusCode['XMLERROR'];
-                break;
-            case 'ERRPHONES':
-                $text = $this->statusCode['ERRPHONES'];
-                break;
-            case 'ERRSTARTTIME':
-                $text = $this->statusCode['ERRSTARTTIME'];
-                break;
-            case 'ERRENDTIME':
-                $text = $this->statusCode['ERRENDTIME'];
-                break;
-            case 'ERRLIFETIME':
-                $text = $this->statusCode['ERRLIFETIME'];
-                break;
-            case 'ERRSPEED':
-                $text = $this->statusCode['ERRSPEED'];
-                break;
-            case 'ERRALFANAME':
-                $text = $this->statusCode['ERRALFANAME'];
-                break;
-            case 'ERRTEXT':
-                $text = $this->statusCode['ERRTEXT'];
-                break;
-            case 'INSUFFICIENTFUNDS':
-                $text = $this->statusCode['INSUFFICIENTFUNDS'];
-                break;
-            default:
-                error_log($this->data);
-                return false;
+        
+        if (array_key_exists($code, $this->statusCode)) {
+            return $this->statusCode[$code];
         }
-
-        return $text;
+        
+        error_log($this->data);
+        
+        return false;
     }
 
     /**
@@ -186,13 +156,13 @@ class ParseXML
      */
     private function processCampaign()
     {
-        $data = [];
+        $campaign = [];
 
         foreach ($this->xml->campaign->attributes() as $attribute => $value) {
-            $data[$attribute] = $value->__toString();
+            $campaign[$attribute] = $value->__toString();
         }
 
-        return $data;
+        return $campaign;
     }
 
     /**
@@ -202,7 +172,7 @@ class ParseXML
      */
     private function processCampaignState()
     {
-        $data = [];
+        $campaignState = [];
         $index = 0;
 
         foreach ($this->xml->campaign->state as $item) {
@@ -210,16 +180,21 @@ class ParseXML
             $val = null;
 
             foreach ($item->attributes() as $attribute => $value) {
-                if ($attribute === 'status') $key = $value->__toString();
-                if ($attribute === 'messages') $val = $value->__toString();
+                if ($attribute === 'status') {
+                    $key = $value->__toString();
+                }
+                
+                if ($attribute === 'messages') { 
+                    $val = $value->__toString();
+                }
             }
 
-            $data['state'][$key] = $val;
+            $campaignState['state'][$key] = $val;
 
             $index++;
         }
 
-        return $data;
+        return $campaignState;
     }
 
     /**
@@ -230,18 +205,18 @@ class ParseXML
      */
     private function processMessage($message)
     {
-        $data = [];
+        $result = [];
         $index = 0;
 
         foreach ($message as $item) {
             foreach ($item->attributes() as $attribute => $value) {
-                $data['message'][$index][$attribute] = $value->__toString();
+                $result['message'][$index][$attribute] = $value->__toString();
             }
 
             $index++;
         }
 
-        return $data;
+        return $result;
     }
 
     /**
@@ -252,20 +227,22 @@ class ParseXML
      */
     private function processState($state = null)
     {
-        $data = [];
+        $result = [];
         $index = 0;
         $state = is_null($state) ? $this->xml->state : $state;
 
         foreach ($state as $item) {
             foreach ($item->attributes() as $attribute => $value) {
-                $data[$index][$attribute] = $value->__toString();
+                $result[$index][$attribute] = $value->__toString();
             }
 
             $index++;
         }
 
-        if ($state->count() === 1) return $data[0];
+        if ($state->count() === 1) {
+            return $result[0];
+        }
 
-        return $data;
+        return $result;
     }
 }

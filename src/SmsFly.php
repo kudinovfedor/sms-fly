@@ -132,9 +132,17 @@ class SmsFly
      */
     public function __construct($args = [])
     {
-        if (!empty($args['login'])) $this->login = $args['login'];
-        if (!empty($args['password'])) $this->password = $args['password'];
-        if (!empty($args['from'])) $this->setFrom($args['from']);
+        if (!empty($args['login'])) {
+            $this->login = $args['login'];
+        }
+        
+        if (!empty($args['password'])) {
+            $this->password = $args['password'];
+        }
+        
+        if (!empty($args['from'])) {
+            $this->setFrom($args['from']);
+        }
 
         $this->parseXML = new ParseXML();
     }
@@ -447,7 +455,9 @@ class SmsFly
     {
         $response = $this->request($data);
 
-        if ($response) return $this->parse($response, $parseMethod);
+        if ($response) {
+            return $this->parse($response, $parseMethod);
+        }
 
         return false;
     }
@@ -479,7 +489,9 @@ class SmsFly
 
         curl_close($ch);
 
-        if ($response) return $response;
+        if ($response) {
+            return $response;
+        }
 
         return false;
     }
